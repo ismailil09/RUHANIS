@@ -2123,6 +2123,8 @@ tbody td.muted{color:var(--text3);}
   <div class="sidebar-section">Main</div>
   <div class="nav-item active" onclick="showPage('dashboard',this)"><span class="nav-icon">📊</span>Dashboard</div>
   <div class="nav-item" onclick="showPage('sales',this)"><span class="nav-icon">🛒</span>Sales & Orders<span class="nav-badge" id="sales-badge">—</span></div>
+  <div class="nav-item" onclick="showPage('baki',this)"><span class="nav-icon">📒</span>বাকি (Due)<span class="nav-badge" id="baki-badge" style="display:none;"></span></div>
+  <div class="nav-item" onclick="showPage('salesmen',this)"><span class="nav-icon">👔</span>Salesmen</div>
   <div class="nav-item" onclick="showPage('inventory',this)"><span class="nav-icon">📦</span>Inventory<span class="nav-badge red" id="inv-badge" style="background:var(--red);">—</span></div>
   <div class="nav-item" onclick="showPage('expense',this)"><span class="nav-icon">💸</span>Expenses</div>
   <div class="nav-item" onclick="showPage('partner',this)"><span class="nav-icon">🤝</span>Partners</div>
@@ -2355,6 +2357,18 @@ tbody td.muted{color:var(--text3);}
           <div class="kpi-label">Cash Flow Balance</div>
           <div class="kpi-value"><span class="tk">৳</span><span id="kpi-cashflow-balance">—</span></div>
           <div class="kpi-change" style="color:var(--text3)" id="kpi-cashflow-sub">Cash Flow module</div>
+        </div>
+        <div class="kpi-card orange" id="kpi-card-baki" onclick="showPage('baki',document.querySelector('.nav-item[onclick*=baki]'))" style="cursor:pointer;" title="বাকি তালিকা দেখুন">
+          <div class="kpi-icon">📒</div>
+          <div class="kpi-label">বাকি (Delivered Due)</div>
+          <div class="kpi-value"><span class="tk">৳</span><span id="kpi-baki">—</span></div>
+          <div class="kpi-change" style="color:var(--text3)" id="kpi-baki-sub">বাকি তালিকা</div>
+        </div>
+        <div class="kpi-card purple" id="kpi-card-salesman" onclick="showPage('salesmen',document.querySelector('.nav-item[onclick*=salesmen]'))" style="cursor:pointer;" title="Salesman পেজ দেখুন">
+          <div class="kpi-icon">👔</div>
+          <div class="kpi-label">Top Salesman (এই মাস)</div>
+          <div class="kpi-value" style="font-size:18px;font-family:'IBM Plex Sans',sans-serif;"><span id="kpi-top-salesman">—</span></div>
+          <div class="kpi-change" style="color:var(--text3)" id="kpi-top-salesman-sub">Salesman module</div>
         </div>
         <div class="kpi-card blue" id="kpi-card-top-region" onclick="openTopRegionModal()" title="Click to see full regional breakdown">
           <div class="kpi-icon">🗺️</div>
@@ -3345,6 +3359,161 @@ tbody td.muted{color:var(--text3);}
           <div class="pt-err" id="pt-e-err" style="color:var(--red);font-size:12px;margin-top:8px;display:none;"></div>
         </div>
         <div class="modal-footer"><button class="btn" onclick="closeModal('pt-edit')">বাতিল</button><button class="btn btn-pt" id="pt-e-save" onclick="ptSaveEdit()" style="background:#D4A017;border-color:#D4A017;color:#000;font-weight:700;">✅ আপডেট করুন</button></div>
+      </div>
+    </div>
+
+    <!-- ═══════ 👔 SALESMEN + 📒 বাকি (RUHANIS) ═══════ -->
+    <style id="sm-style">
+      .sm-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px;}
+      .sm-kpi{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;}
+      .sm-kpi small{display:block;color:var(--text3);font-size:11px;letter-spacing:.4px;margin-bottom:4px;}
+      .sm-kpi strong{font-size:20px;font-family:'IBM Plex Mono',monospace;color:var(--text);}
+      .sm-bar{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--border);}
+      .sm-bar label{display:block;font-size:11px;color:var(--text3);margin-bottom:3px;}
+      .sm-note{font-size:12px;color:var(--text3);padding:10px 18px;border-top:1px dashed var(--border);}
+      .sm-link{color:var(--gold);cursor:pointer;font-weight:700;text-decoration:underline dotted;}
+      .sm-tag{display:inline-block;margin-top:2px;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;background:rgba(88,166,255,.15);color:#58a6ff;}
+      .sm-fail{color:var(--red);font-weight:700;}
+      .pay-badge[class*="due"]{background:rgba(248,81,73,.15);color:var(--red);}
+      .sm-inactive{opacity:.55;}
+      #page-salesmen .page-header,#page-baki .page-header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px;margin-bottom:14px;}
+      #page-salesmen .page-title,#page-baki .page-title{font-size:20px;font-weight:700;}
+      #page-salesmen .page-sub,#page-baki .page-sub{font-size:12px;color:var(--text3);margin-top:2px;}
+    </style>
+
+    <div class="page" id="page-salesmen">
+      <div class="page-header">
+        <div>
+          <div class="page-title">👔 Salesmen</div>
+          <div class="page-sub">কে কয়টা অর্ডার করল, কয়টা ফেল হলো, কত টাকা প্রদেয় — সব এক জায়গায়</div>
+        </div>
+        <div class="cf-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-gold" onclick="smOpenEdit(null)">＋ নতুন Salesman</button>
+          <button class="btn" onclick="smReload()">🔄 রিফ্রেশ</button>
+          <button class="btn" style="background:rgba(88,166,255,0.15);border-color:rgba(88,166,255,0.4);color:#58a6ff;" onclick="smOpenImport()">📥 Import CSV</button>
+          <button class="btn" onclick="smExport()">📥 Export</button>
+          <button class="btn" onclick="smPrint()">🖨️ Print</button>
+        </div>
+      </div>
+      <div class="sm-kpis" id="sm-kpis"></div>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div class="sm-bar">
+          <div><label>মাস বাছুন</label><input type="month" class="form-input" id="sm-month" oninput="smPeriod(this.value)"></div>
+          <div><button class="btn" onclick="smAll()">সব সময়</button></div>
+          <div><button class="btn" onclick="smThisMonth()">এই মাস</button></div>
+          <span id="sm-period-label" style="color:var(--text3);font-size:12px;margin-left:auto;"></span>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Salesman</th><th style="text-align:right;">মোট অর্ডার</th><th style="text-align:right;">✅ Delivered</th><th style="text-align:right;">⏳ চলমান</th><th style="text-align:right;">❌ ফেল (Return/Cancel)</th><th style="text-align:right;">সফলতা</th><th style="text-align:right;">বিক্রয় (Delivered)</th><th style="text-align:right;">প্রতি সেল</th><th style="text-align:right;">কমিশন</th><th style="text-align:right;">মাসিক বেতন</th><th style="text-align:right;">মোট প্রদেয়</th><th></th></tr></thead>
+            <tbody id="sm-body"><tr><td colspan="12" style="text-align:center;color:var(--text3);padding:40px;">লোড হচ্ছে…</td></tr></tbody>
+            <tfoot id="sm-foot"></tfoot>
+          </table>
+        </div>
+        <div class="sm-note">📐 কমিশন = Delivered অর্ডার × প্রতি সেলের টাকা · মোট প্রদেয় = কমিশন + মাসিক বেতন (বেতন শুধু নির্দিষ্ট মাস বাছলে যোগ হয়) · ফেল = Returned + Cancelled · নাম ক্লিক করলে ওই Salesman-এর অর্ডার তালিকা দেখা যাবে</div>
+      </div>
+    </div>
+
+    <div class="page" id="page-baki">
+      <div class="page-header">
+        <div>
+          <div class="page-title">📒 বাকি (Due)</div>
+          <div class="page-sub">ডেলিভারি হয়ে গেছে কিন্তু টাকা বাকি — কার কাছে কত পাবেন</div>
+        </div>
+        <div class="cf-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn" onclick="bakiReload()">🔄 রিফ্রেশ</button>
+          <button class="btn" onclick="bakiExport()">📥 Export</button>
+          <button class="btn" onclick="bakiPrint()">🖨️ Print</button>
+        </div>
+      </div>
+      <div class="sm-kpis" id="baki-kpis"></div>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div class="sm-bar">
+          <div><label>খুঁজুন</label><input type="text" class="form-input" id="baki-q" placeholder="নাম / ফোন / অর্ডার # / প্রোডাক্ট…" oninput="bakiRender()"></div>
+          <div><label>কোন অর্ডার</label>
+            <select class="form-select" id="baki-mode" onchange="bakiRender()">
+              <option value="delivered">শুধু Delivered (ডেলিভারি হয়ে গেছে)</option>
+              <option value="all">সব চলমান অর্ডারের বাকি</option>
+            </select>
+          </div>
+          <span id="baki-count" style="color:var(--text3);font-size:12px;margin-left:auto;"></span>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Order #</th><th>তারিখ</th><th>গ্রাহক</th><th>ফোন</th><th>পণ্য</th><th style="text-align:right;">মোট বিল</th><th style="text-align:right;">পেয়েছি</th><th style="text-align:right;">বাকি</th><th style="text-align:right;">কত দিন</th><th>Status</th><th>Salesman</th><th></th></tr></thead>
+            <tbody id="baki-body"><tr><td colspan="12" style="text-align:center;color:var(--text3);padding:40px;">লোড হচ্ছে…</td></tr></tbody>
+            <tfoot id="baki-foot"></tfoot>
+          </table>
+        </div>
+        <div class="sm-note">💡 অর্ডার এন্ট্রির সময় Payment Method-এ <strong>"Due (বাকি)"</strong> বাছুন এবং Paid-এ যা পেয়েছেন তা দিন — বাকিটা এখানে আসবে। টাকা পেলে "💰 আদায়" চাপুন; পুরো শোধ হলে অর্ডার নিজে থেকে বাকি তালিকা থেকে সরে যাবে।</div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-sm-edit" onclick="if(event.target===this)closeModal('sm-edit')">
+      <div class="modal-box modal" style="max-width:480px;">
+        <div class="modal-header"><span class="modal-title" id="sm-edit-title">👔 নতুন Salesman</span><button class="modal-close" onclick="closeModal('sm-edit')">✕</button></div>
+        <div class="modal-body">
+          <div class="form-group" style="margin-bottom:12px;"><label class="form-label">নাম *</label><input class="form-input" id="sm-f-name" maxlength="60" placeholder="যেমন: Rahim">
+            <div id="sm-f-name-hint" style="display:none;font-size:11px;color:var(--text3);margin-top:4px;">নাম একবার সেভ করলে বদলানো যায় না (পুরনো অর্ডারের হিসাব ঠিক রাখতে)।</div></div>
+          <div class="form-grid" style="margin-bottom:12px;">
+            <div class="form-group"><label class="form-label">প্রতি সেলে (৳)</label><input class="form-input" id="sm-f-persale" type="number" min="0" step="0.01" placeholder="0"></div>
+            <div class="form-group"><label class="form-label">মাসিক বেতন (৳)</label><input class="form-input" id="sm-f-salary" type="number" min="0" step="0.01" placeholder="0"></div>
+          </div>
+          <div class="form-group" style="margin-bottom:12px;"><label class="form-label">নোট</label><input class="form-input" id="sm-f-note" maxlength="300" placeholder="ঐচ্ছিক"></div>
+          <label style="display:flex;gap:8px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" id="sm-f-active" checked> সক্রিয় (অর্ডার ফর্মে নাম দেখাবে)</label>
+        </div>
+        <div class="modal-footer" style="justify-content:space-between;">
+          <button class="btn" id="sm-f-del" style="display:none;background:var(--red);color:#fff;border-color:var(--red);" onclick="smDelete()">🗑️ মুছুন</button>
+          <span style="display:flex;gap:8px;margin-left:auto;"><button class="btn" onclick="closeModal('sm-edit')">বাতিল</button><button class="btn btn-gold" id="sm-f-save" onclick="smSave()">✅ সেভ</button></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-sm-import" onclick="if(event.target===this)closeModal('sm-import')">
+      <div class="modal-box modal" style="max-width:620px;">
+        <div class="modal-header"><span class="modal-title">📥 CSV Import — Salesmen</span><button class="modal-close" onclick="closeModal('sm-import')">✕</button></div>
+        <div class="modal-body" style="padding:16px;">
+          <div style="background:rgba(88,166,255,0.08);border:1px solid rgba(88,166,255,0.3);border-radius:10px;padding:14px;margin-bottom:14px;font-size:13px;line-height:1.8;color:var(--text2);">
+            <strong style="color:#58a6ff;">📋 CSV Format:</strong>
+            <span style="color:var(--text3);font-family:'IBM Plex Mono',monospace;font-size:11px;display:block;">Name, Per Sale, Monthly Salary, Note, Active</span>
+            <span style="color:var(--gold);">শুধু Name আবশ্যক। যে নাম আগে থেকে আছে সেটা বাদ যাবে (ডুপ্লিকেট হবে না)।</span><br>
+            <a href="javascript:void(0)" onclick="smSampleCSV()" style="color:#58a6ff;text-decoration:underline;">📄 নমুনা CSV ডাউনলোড</a>
+            <br><span style="color:var(--text3);font-size:12px;">Excel ফাইল হলে আগে File → Save As → CSV করুন</span>
+          </div>
+          <div id="sm-imp-drop" style="border:2px dashed var(--border);border-radius:12px;padding:30px;text-align:center;cursor:pointer;margin-bottom:14px;" onclick="document.getElementById('sm-imp-file').click()" ondragover="event.preventDefault();this.style.borderColor='var(--green)'" ondragleave="this.style.borderColor='var(--border)'" ondrop="event.preventDefault();smImpRead(event.dataTransfer.files[0])">
+            <div style="font-size:32px;margin-bottom:8px;">📂</div>
+            <div style="font-size:14px;font-weight:600;color:var(--text);">CSV ফাইল drop করুন বা click করুন</div>
+            <input type="file" id="sm-imp-file" accept=".csv,.txt" style="display:none" onchange="smImpRead(this.files[0])">
+          </div>
+          <div id="sm-imp-preview" style="display:none;">
+            <div style="font-size:13px;font-weight:600;margin-bottom:8px;" id="sm-imp-summary"></div>
+            <div style="overflow:auto;max-height:240px;border:1px solid var(--border);border-radius:8px;"><table style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="position:sticky;top:0;background:var(--bg2);"><tr><th style="padding:6px 10px;text-align:left;">নাম</th><th style="padding:6px 10px;text-align:right;">প্রতি সেল</th><th style="padding:6px 10px;text-align:right;">বেতন</th><th style="padding:6px 10px;text-align:left;">অবস্থা</th></tr></thead><tbody id="sm-imp-tbody"></tbody></table></div>
+          </div>
+        </div>
+        <div class="modal-footer"><button class="btn" onclick="closeModal('sm-import')">বাতিল</button><button class="btn btn-gold" id="sm-imp-go" style="display:none;" onclick="smImpGo()">📥 Import করুন</button></div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-sm-drill" onclick="if(event.target===this)closeModal('sm-drill')">
+      <div class="modal-box modal" style="max-width:900px;width:96vw;">
+        <div class="modal-header"><span class="modal-title" id="sm-drill-title">অর্ডার</span><button class="modal-close" onclick="closeModal('sm-drill')">✕</button></div>
+        <div class="modal-body" id="sm-drill-body" style="max-height:70vh;overflow:auto;"></div>
+        <div class="modal-footer"><button class="btn" onclick="closeModal('sm-drill')">বন্ধ করুন</button></div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-baki-collect" onclick="if(event.target===this)closeModal('baki-collect')">
+      <div class="modal-box modal" style="max-width:440px;">
+        <div class="modal-header"><span class="modal-title">💰 বাকি আদায়</span><button class="modal-close" onclick="closeModal('baki-collect')">✕</button></div>
+        <div class="modal-body">
+          <div id="baki-c-info" style="padding:10px 12px;background:var(--bg3);border-radius:8px;font-size:13px;line-height:1.7;margin-bottom:12px;"></div>
+          <div class="form-grid">
+            <div class="form-group"><label class="form-label">আদায়ের পরিমাণ (৳) *</label><input class="form-input" id="baki-c-amt" type="number" min="0" step="0.01" oninput="bakiCPrev()"></div>
+            <div class="form-group"><label class="form-label">কীভাবে পেলেন</label><select class="form-select" id="baki-c-method"><option>Cash</option><option>bKash</option><option>Nagad</option><option>Bank Transfer</option></select></div>
+          </div>
+          <div id="baki-c-prev" style="margin-top:10px;font-size:12px;color:var(--text3);"></div>
+        </div>
+        <div class="modal-footer"><button class="btn" onclick="closeModal('baki-collect')">বাতিল</button><button class="btn btn-gold" id="baki-c-save" onclick="bakiCSave()">✅ আদায় সেভ করুন</button></div>
       </div>
     </div>
 
@@ -4731,7 +4900,7 @@ tbody td.muted{color:var(--text3);}
         <div class="form-group"><label class="form-label">Paid Amount (৳)</label><input class="form-input" id="order-paid" type="number" placeholder="0" oninput="calcDue()"></div>
         <div class="form-group"><label class="form-label">Due (৳)</label><input class="form-input" type="number" id="due-amount" readonly></div>
         <div class="form-group"><label class="form-label">Delivery Charge (৳)</label><input class="form-input" id="order-delivery" type="number" placeholder="0" oninput="calcDue()"></div>
-        <div class="form-group"><label class="form-label">Payment Method</label><select class="form-select" id="order-payment" onchange="toggleCodField()"><option>Cash</option><option>bKash</option><option>Nagad</option><option>Bank Transfer</option><option>COD</option></select></div>
+        <div class="form-group"><label class="form-label">Payment Method</label><select class="form-select" id="order-payment" onchange="toggleCodField()"><option>Cash</option><option>bKash</option><option>Nagad</option><option>Bank Transfer</option><option>COD</option><option value="Due (বাকি)">Due (বাকি)</option></select></div>
         <div class="form-group" id="cod-charge-group" style="display:none;">
           <label class="form-label">COD Charge % <span style="color:var(--text3);font-size:10px;">(কুরিয়ার কাটবে)</span></label>
           <select class="form-select" id="order-cod-pct" onchange="this.dataset.auto='0';calcDue()">
@@ -4754,6 +4923,7 @@ tbody td.muted{color:var(--text3);}
         <div class="form-group"><label class="form-label">Order Status</label><select class="form-select" id="order-status"><option>Pending</option><option>Processing</option><option>In Transit</option><option>Delivered</option><option>Returned</option><option>Cancelled</option></select></div>
         <div class="form-group"><label class="form-label">Courier</label><select class="form-select" id="order-courier" onchange="toggleCodField()"><option value="">Select Courier</option><option>Pathao</option><option>Steadfast</option><option>Redx</option><option>SA Paribahan</option><option>Sundarban</option><option>Janani</option></select></div>
         <div class="form-group"><label class="form-label">Tracking ID</label><input class="form-input" id="order-tracking" placeholder="Courier tracking number" type="text"></div>
+        <div class="form-group"><label class="form-label">👔 Salesman <span style="color:var(--text3);font-size:10px;">(কে সেল করেছে)</span></label><select class="form-select" id="order-salesman"><option value="">— কেউ না —</option></select></div>
         <div class="form-group full"><label class="form-label">Notes <span style="color:var(--text3);font-size:10px;">(⚠️ কুরিয়ার বুকিং-এ যাবে — কাস্টমার দেখতে পারবে)</span></label><textarea class="form-textarea" id="order-notes" placeholder="Any special instructions..."></textarea></div>
         <div class="form-group full"><label class="form-label">Description <span style="color:var(--text3);font-size:10px;">(🔒 শুধু আমরা দেখব — কুরিয়ারে কখনো যাবে না)</span></label><textarea class="form-textarea" id="order-description" placeholder="নিজেদের মনে রাখার জন্য — এটা কুরিয়ার বুকিং-এ পাঠানো হবে না..."></textarea></div>
 
@@ -5683,7 +5853,7 @@ tbody td.muted{color:var(--text3);}
 // ═══════════════════════════════════════════════════════════════
 
 // ⚠️ এখানে আপনার Google Apps Script Web App URL বসান (Deploy > New Deployment > Web App)
-      const API_URL = "https://script.google.com/macros/s/AKfycbz9ed3a-ssnitg-yuBfepRSvycnsH5bYVeL7zbgDmOo6PAhU-TbgSTFqr3Jjr4BzJSpWw/exec"; // ← এই URL পরিবর্তন করুন // ← এখানে আপনার Google Apps Script URL বসান
+      const API_URL = "https://script.google.com/macros/s/AKfycbzh3XdtIapIRlMsZxd8_UTGT-PXOBzBZ1SHkK1zUPEkve4H4pT6cchxqP_NBDuv_be7/exec"; // ← এই URL পরিবর্তন করুন // ← এখানে আপনার Google Apps Script URL বসান
 
 // ─── CONNECTION STATE ────────────────────────────────────────
 let apiConnected = false;
@@ -8016,6 +8186,8 @@ function showPage(id, el) {
   if(id==='investors') loadInvestors();
   if(id==='recycle-bin') loadRecycleBin();
   if(id==='strategy-hub') loadStrategyHubAll();
+  if(id==='salesmen' && window.smOpenPage) smOpenPage();
+  if(id==='baki' && window.bakiOpenPage) bakiOpenPage();
   if(window.innerWidth<=900) closeSidebarMobile();
   if(id !== 'activity-log' && id !== 'recycle-bin') logAction(`"${pageTitles[id]?.[0] || id}" পেজ ভিজিট করেছেন`);
 
@@ -8201,6 +8373,7 @@ function _groupSalesRows(rows){
         g.trackingLink = r.trackingLink;
         primaryScore.set(key, s);
       }
+      if (!g.salesman && r.salesman) g.salesman = r.salesman;
     }
   });
   return order.map(k=>map.get(k));
@@ -8220,7 +8393,7 @@ function _renderSalesPage() {
     <tr>
       <td class="mono muted">${r.id}</td>
       <td class="mono">${r.date}<br><span style="color:var(--text3);font-size:11px;">${r.time||''}</span></td>
-      <td><strong>${r.customer}</strong></td>
+      <td><strong>${r.customer}</strong>${r.salesman?`<div><span class="sm-tag" title="Salesman">👔 ${String(r.salesman).replace(/</g,'&lt;')}</span></div>`:''}</td>
       <td class="mono">${r.phone}</td>
       <td>${r.div}</td><td>${r.dist}</td>
       <td>${productCell}</td>
@@ -9470,6 +9643,7 @@ async function loadLiveSales(){
       // (internal-only, কুরিয়ার বুকিং নোটে কখনো যায় না — NOTES থেকে আলাদা রাখা হয়েছে)
       trackingLink: String(r[28]||''),
       unitCost:    Number(r[29])||0,   // 🔒 বিক্রির সময়ের ইউনিট Cost (snapshot)
+      salesman:    String(r[30]||'').trim(),   // 👔 Col AE — কে সেল করেছে
     };
   }).filter(r=>r.customer && r.customer.trim()); // skip empty rows
   // BUG 2 FIX: Reverse so newest orders (highest SL#) appear at top
@@ -10446,6 +10620,7 @@ async function submitOrder(){
     project: (document.getElementById('order-project')?.value || 'RUHANIS'),
     splitIsmail: parseFloat(document.getElementById('split-ismail')?.value||0),
     splitAshik:  parseFloat(document.getElementById('split-ashik')?.value||0),
+    salesman: (document.getElementById('order-salesman')?.value||'').trim(),
   };
   closeModal('add-order');
   resetOrderModal();
@@ -10675,6 +10850,7 @@ function openEditOrder(r){
   document.getElementById('due-amount').value=r.due||0;
   m.querySelector('#order-delivery').value=r.delivery||0;
   m.querySelector('#order-payment').value=r.payment||'Cash';
+  try{ if(window.smFillOrderSelect) smFillOrderSelect(r.salesman||''); }catch(_e){}
   m.querySelector('#order-status').value=r.status||'Pending';
   m.querySelector('#order-courier').value=r.courier||'';
   m.querySelector('#order-tracking').value=r.tracking||'';
@@ -11243,6 +11419,7 @@ function resetOrderModal(){
   // ✅ FIX (Multi-product order, Sept 2026): প্রোডাক্ট-লাইন লিস্টও রিসেট করো
   window._orderItems = [{ product:'', qty:1, price:0 }];
   _renderOrderItems();
+  try{ if(window.smFillOrderSelect) smFillOrderSelect(''); }catch(_e){}
 }
 
 // ─── ADD / EDIT PRODUCT ──────────────────────────────────────
@@ -11577,7 +11754,7 @@ function applyOrderFormDefaults(){
   if(deliveryEl && !deliveryEl.value){ deliveryEl.value = 150; }
 
   const paymentSel = m.querySelector('#order-payment');
-  if(paymentSel){
+  if(paymentSel && !currentEditOrderId){   // Edit-এ সেভ করা Payment Method (যেমন "Due (বাকি)") যেন COD দিয়ে ওভাররাইট না হয়
     const codOpt = Array.from(paymentSel.options).find(o=>o.text.toUpperCase().includes('COD'));
     if(codOpt) paymentSel.value = codOpt.value || codOpt.text;
   }
@@ -17179,6 +17356,379 @@ table{width:100%;border-collapse:collapse}th{background:#0f2a5c;color:#fff;text-
   };
 })();
 
+</script>
+<script>
+/* ═══ 👔 Salesmen + 📒 বাকি (RUHANIS) — স্বতন্ত্র মডিউল; মূল Sales ডেটা শুধু পড়ে ═══ */
+(function(){
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  const num = n => (Number(n) || 0).toLocaleString('en-BD', { maximumFractionDigits: 2 });
+  const tk = n => '৳' + num(n);
+  const MON = { jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12 };
+  const MON_BN = ['জানুয়ারি','ফেব্রুয়ারি','মার্চ','এপ্রিল','মে','জুন','জুলাই','আগস্ট','সেপ্টেম্বর','অক্টোবর','নভেম্বর','ডিসেম্বর'];
+  const toast = (m, t) => { try { showToast(m, t || 'success'); } catch (e) {} };
+  const SM = { list: [], loaded: false, ym: '', rows: [], busy: false, editId: null, lastLoad: 0 };
+  const BK = { rows: [], cur: null, busy: false };
+  const todayYM = () => { try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dhaka' }).format(new Date()).slice(0, 7); } catch (e) { return new Date().toISOString().slice(0, 7); } };
+  SM.ym = todayYM();
+  const FAIL = ['Returned', 'Cancelled'], ACTIVE = ['Pending', 'Processing', 'In Transit'];
+
+  function ordParts(o) {
+    const m = /(\d{1,2})\W+([A-Za-z]{3})[a-z]*\W+(\d{4})/.exec(String(o.date || ''));
+    if (m && MON[m[2].toLowerCase()]) return { y: +m[3], m: MON[m[2].toLowerCase()], d: +m[1] };
+    const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(o.rawDateISO || ''));
+    return iso ? { y: +iso[1], m: +iso[2], d: +iso[3] } : null;
+  }
+  const ordYM = o => { const p = ordParts(o); return p ? p.y + '-' + String(p.m).padStart(2, '0') : ''; };
+  const ordDays = o => { const p = ordParts(o); if (!p) return null; const now = new Date(); return Math.max(0, Math.floor((Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) - Date.UTC(p.y, p.m - 1, p.d)) / 86400000)); };
+  function allOrders() {
+    const rows = Array.isArray(window.allSales) ? window.allSales : [];
+    return (typeof _groupSalesRows === 'function') ? _groupSalesRows(rows) : rows;
+  }
+  async function ensureSales(force) {
+    if (force || !(window.allSales || []).length) { try { await loadLiveSales(); } catch (e) {} }
+  }
+
+  // ───────── Salesman তালিকা ─────────
+  async function loadSalesmen() {
+    try {
+      const d = await fetchFromAPI('salesmen');
+      if (d && Array.isArray(d.data)) { SM.list = d.data; SM.loaded = true; SM.lastLoad = Date.now(); }
+    } catch (e) {}
+    fillOrderSelect();
+    return SM.list;
+  }
+  function fillOrderSelect(cur) {
+    const sel = $('order-salesman'); if (!sel) return;
+    if (cur === undefined) cur = sel.value || '';
+    const names = SM.list.filter(s => s.active).map(s => s.name);
+    if (cur && !names.some(n => n.toLowerCase() === String(cur).toLowerCase())) names.push(cur);
+    sel.innerHTML = '<option value="">— কেউ না —</option>' + names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+    sel.value = cur || '';
+  }
+
+  // ───────── হিসাব ─────────
+  function compute() {
+    const period = SM.ym || '';
+    const map = {};
+    const mk = (s, ghost) => ({ s, name: s ? s.name : 'কেউ না (Salesman ছাড়া)', perSale: s ? Number(s.perSale) || 0 : 0, salary: s ? Number(s.salary) || 0 : 0, active: s ? s.active !== false : true, none: !s, ghost: !!ghost, orders: [], total: 0, delivered: 0, running: 0, failed: 0, sales: 0 });
+    SM.list.forEach(s => { map[s.name.toLowerCase()] = mk(s); });
+    const none = mk(null);
+    allOrders().forEach(o => {
+      if (period && ordYM(o) !== period) return;
+      const nm = String(o.salesman || '').trim(), key = nm.toLowerCase();
+      let t = none;
+      if (key) t = map[key] || (map[key] = mk({ name: nm, perSale: 0, salary: 0, active: false }, true));
+      t.orders.push(o); t.total++;
+      if (o.status === 'Delivered') { t.delivered++; t.sales += Number(o.total) || 0; }
+      else if (FAIL.includes(o.status)) t.failed++;
+      else t.running++;
+    });
+    const rows = Object.keys(map).map(k => map[k]).filter(t => t.active || t.total > 0);
+    rows.forEach(t => { t.commission = t.delivered * t.perSale; t.paySalary = period ? t.salary : 0; t.payable = t.commission + t.paySalary; });
+    rows.sort((a, b) => b.delivered - a.delivered || b.total - a.total || a.name.localeCompare(b.name));
+    if (none.total > 0) { none.commission = 0; none.paySalary = 0; none.payable = 0; rows.push(none); }
+    return rows;
+  }
+  const periodLabel = () => { const m = /^(\d{4})-(\d{2})$/.exec(SM.ym || ''); return m ? `${MON_BN[+m[2] - 1]} ${m[1]}` : 'সব সময়'; };
+
+  // ───────── Salesmen পেজ ─────────
+  function render() {
+    const body = $('sm-body'); if (!body) return;
+    const rows = SM.rows = compute();
+    if ($('sm-month')) $('sm-month').value = SM.ym || '';
+    if ($('sm-period-label')) $('sm-period-label').textContent = '📅 ' + periodLabel() + (SM.ym ? '' : ' — বেতন যোগ হয়নি, মাস বাছুন');
+    const real = rows.filter(r => !r.none);
+    const T = real.reduce((a, r) => ({ total: a.total + r.total, del: a.del + r.delivered, run: a.run + r.running, fail: a.fail + r.failed, sales: a.sales + r.sales, comm: a.comm + r.commission, sal: a.sal + r.paySalary, pay: a.pay + r.payable }), { total: 0, del: 0, run: 0, fail: 0, sales: 0, comm: 0, sal: 0, pay: 0 });
+    $('sm-kpis').innerHTML = [
+      ['👔 সক্রিয় Salesman', SM.list.filter(s => s.active).length],
+      ['🛒 মোট অর্ডার (Salesman সহ)', T.total],
+      ['✅ Delivered', T.del],
+      ['❌ ফেল', `<span class="sm-fail">${T.fail}</span>`],
+      ['💵 বিক্রয় (Delivered)', tk(T.sales)],
+      ['💰 মোট প্রদেয় (বেতন+কমিশন)', tk(T.pay)],
+    ].map(k => `<div class="sm-kpi"><small>${k[0]}</small><strong>${k[1]}</strong></div>`).join('');
+    if (!rows.length) {
+      body.innerHTML = `<tr><td colspan="12" style="text-align:center;color:var(--text3);padding:40px;">${SM.list.length ? 'এই সময়ে কোনো অর্ডার নেই' : 'এখনো কোনো Salesman যোগ করা হয়নি — "＋ নতুন Salesman" চাপুন'}</td></tr>`;
+      $('sm-foot').innerHTML = ''; return;
+    }
+    body.innerHTML = rows.map((t, i) => {
+      const rate = t.total ? Math.round(t.delivered / Math.max(1, t.delivered + t.failed) * 100) : 0;
+      const nameCell = t.none ? `<span style="color:var(--text3);">${esc(t.name)}</span>` : `<span class="sm-link" onclick="smDrill(${i})">${esc(t.name)}</span>${t.active ? '' : ' <span class="sm-tag" style="background:rgba(139,148,158,.2);color:var(--text3);">নিষ্ক্রিয়</span>'}${t.ghost ? ' <span class="sm-tag" style="background:rgba(248,81,73,.15);color:var(--red);">তালিকায় নেই</span>' : ''}`;
+      return `<tr class="${t.active ? '' : 'sm-inactive'}">
+        <td>${nameCell}</td>
+        <td class="mono" style="text-align:right;">${t.total}</td>
+        <td class="mono" style="text-align:right;color:var(--green);">${t.delivered}</td>
+        <td class="mono" style="text-align:right;">${t.running}</td>
+        <td class="mono ${t.failed ? 'sm-fail' : ''}" style="text-align:right;">${t.failed}</td>
+        <td class="mono" style="text-align:right;">${t.none ? '—' : (t.delivered + t.failed ? rate + '%' : '—')}</td>
+        <td class="mono" style="text-align:right;">${tk(t.sales)}</td>
+        <td class="mono" style="text-align:right;">${t.none ? '—' : tk(t.perSale)}</td>
+        <td class="mono" style="text-align:right;">${t.none ? '—' : tk(t.commission)}</td>
+        <td class="mono" style="text-align:right;">${t.none ? '—' : (SM.ym ? tk(t.salary) : '<span style="color:var(--text3)" title="মাস বাছলে যোগ হবে">(' + tk(t.salary) + '/মাস)</span>')}</td>
+        <td class="mono" style="text-align:right;font-weight:700;color:var(--gold);">${t.none ? '—' : tk(t.payable)}</td>
+        <td>${t.none || t.ghost ? '' : `<button class="btn" style="padding:4px 10px;font-size:11px;" onclick="smOpenEdit(${t.s.id})">✏️</button>`}</td>
+      </tr>`;
+    }).join('');
+    $('sm-foot').innerHTML = `<tr style="font-weight:700;border-top:2px solid var(--border);"><td>মোট</td><td class="mono" style="text-align:right;">${T.total}</td><td class="mono" style="text-align:right;color:var(--green);">${T.del}</td><td class="mono" style="text-align:right;">${T.run}</td><td class="mono sm-fail" style="text-align:right;">${T.fail}</td><td></td><td class="mono" style="text-align:right;">${tk(T.sales)}</td><td></td><td class="mono" style="text-align:right;">${tk(T.comm)}</td><td class="mono" style="text-align:right;">${SM.ym ? tk(T.sal) : '—'}</td><td class="mono" style="text-align:right;color:var(--gold);">${tk(T.pay)}</td><td></td></tr>`;
+  }
+  async function openPage() {
+    render();
+    await Promise.all([ensureSales(false), loadSalesmen()]);
+    render(); refreshDash();
+  }
+  async function reload() { await Promise.all([ensureSales(true), loadSalesmen()]); render(); refreshDash(); toast('✅ রিফ্রেশ হয়েছে'); }
+
+  function drill(i) {
+    const t = SM.rows[i]; if (!t) return;
+    $('sm-drill-title').textContent = `👔 ${t.name} — ${periodLabel()} (${t.total}টি অর্ডার)`;
+    const st = s => `<span class="status ${String(s || '').toLowerCase().replace(/ /g, '')}">${esc(s)}</span>`;
+    const list = t.orders.slice().sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0));
+    $('sm-drill-body').innerHTML = `<div style="margin-bottom:10px;font-size:13px;">✅ Delivered <b style="color:var(--green)">${t.delivered}</b> · ⏳ চলমান <b>${t.running}</b> · ❌ ফেল <b class="sm-fail">${t.failed}</b></div>
+      <div class="table-wrap"><table class="data-table"><thead><tr><th>#</th><th>তারিখ</th><th>গ্রাহক</th><th>পণ্য</th><th style="text-align:right;">মোট</th><th>Status</th></tr></thead><tbody>${list.map(o => `<tr><td class="mono">${esc(o.id)}</td><td class="mono">${esc(o.date)}</td><td>${esc(o.customer)}</td><td>${(o.items || [{ product: o.product }]).map(x => esc(x.product)).join(', ')}</td><td class="mono" style="text-align:right;">${tk(o.total)}</td><td>${st(o.status)}</td></tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:20px;">কোনো অর্ডার নেই</td></tr>'}</tbody></table></div>`;
+    openModal('sm-drill');
+  }
+
+  function openEdit(id) {
+    SM.editId = id == null ? null : id;
+    const s = id == null ? null : SM.list.find(x => x.id === Number(id));
+    $('sm-edit-title').textContent = s ? '✏️ Salesman Edit — ' + s.name : '👔 নতুন Salesman';
+    $('sm-f-name').value = s ? s.name : ''; $('sm-f-name').disabled = !!s; $('sm-f-name-hint').style.display = s ? 'block' : 'none';
+    $('sm-f-persale').value = s ? s.perSale : ''; $('sm-f-salary').value = s ? s.salary : '';
+    $('sm-f-note').value = s ? s.note || '' : ''; $('sm-f-active').checked = s ? s.active !== false : true;
+    $('sm-f-del').style.display = s ? '' : 'none';
+    openModal('sm-edit');
+  }
+  async function save() {
+    if (SM.busy) return;
+    const editing = SM.editId != null;
+    const name = $('sm-f-name').value.trim().replace(/\s+/g, ' ');
+    if (!name) { toast('⚠️ Salesman-এর নাম লিখুন', 'error'); return; }
+    const ps = parseFloat($('sm-f-persale').value || 0), sal = parseFloat($('sm-f-salary').value || 0);
+    if (!(ps >= 0) || !(sal >= 0)) { toast('⚠️ টাকার পরিমাণ সঠিক দিন', 'error'); return; }
+    SM.busy = true; const btn = $('sm-f-save'); btn.disabled = true;
+    try {
+      const payload = editing
+        ? { action: 'updateSalesman', id: SM.editId, perSale: ps, salary: sal, note: $('sm-f-note').value.trim(), active: $('sm-f-active').checked }
+        : { action: 'addSalesman', name, perSale: ps, salary: sal, note: $('sm-f-note').value.trim() };
+      const r = await postToAPI(payload);
+      if (r && r.status !== 'error') {
+        closeModal('sm-edit'); toast(editing ? '✅ আপডেট হয়েছে' : '✅ Salesman যোগ হয়েছে');
+        try { logAction(`Salesman ${editing ? 'আপডেট' : 'যোগ'}: ${name}`); } catch (e) {}
+        await loadSalesmen(); render(); refreshDash();
+      } else if (r && r.message) toast('❌ ' + r.message, 'error');
+    } finally { SM.busy = false; btn.disabled = false; }
+  }
+  async function del() {
+    if (SM.busy || SM.editId == null) return;
+    const s = SM.list.find(x => x.id === Number(SM.editId)); if (!s) return;
+    if (!confirm(`"${s.name}" মুছে ফেলবেন? (অর্ডার থাকলে মোছা যাবে না — নিষ্ক্রিয় করুন)`)) return;
+    SM.busy = true;
+    try {
+      const r = await postToAPI({ action: 'deleteSalesman', id: SM.editId });
+      if (r && r.status !== 'error') { closeModal('sm-edit'); toast('🗑️ মুছে ফেলা হয়েছে'); await loadSalesmen(); render(); refreshDash(); }
+      else if (r && r.message) toast('❌ ' + r.message, 'error');
+    } finally { SM.busy = false; }
+  }
+
+  const csv = (rows, name) => { try { window.__igxCsv.downloadCSV(rows, name); } catch (e) { toast('Export করা যায়নি', 'error'); } };
+  function exportSm() {
+    const rows = [['Salesman', 'মোট অর্ডার', 'Delivered', 'চলমান', 'ফেল', 'বিক্রয়', 'প্রতি সেল', 'কমিশন', 'মাসিক বেতন', 'মোট প্রদেয়', 'সময়']];
+    SM.rows.filter(t => !t.none).forEach(t => rows.push([t.name, t.total, t.delivered, t.running, t.failed, t.sales, t.perSale, t.commission, t.paySalary, t.payable, periodLabel()]));
+    csv(rows, `salesmen_${SM.ym || 'all'}.csv`);
+  }
+  function printHtml(title, sub, head, bodyRows, foot) {
+    const w = window.open('', '_blank'); if (!w) { toast('পপ-আপ ব্লক করা আছে — অনুমতি দিন', 'error'); return; }
+    const logo = window.RUH_LOGO_BLACK || '';
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${esc(title)}</title><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700&display=swap" rel="stylesheet"><style>
+@page{size:A4 landscape;margin:12mm}body{font-family:'Noto Sans Bengali',Arial,sans-serif;color:#111;font-size:12px;margin:0}
+.hd{display:flex;align-items:center;gap:14px;border-bottom:2px solid #0f2a5c;padding-bottom:8px;margin-bottom:10px}.hd img{max-height:52px}.hd b{font-size:18px;color:#0f2a5c;display:block}.hd span{font-size:11px;color:#555}
+table{width:100%;border-collapse:collapse}th{background:#0f2a5c;color:#fff;text-align:left;padding:5px 6px;font-size:11px}td{padding:4px 6px;border-bottom:1px solid #ddd;vertical-align:top}tr{page-break-inside:avoid}
+.r{text-align:right;white-space:nowrap}tfoot td{font-weight:700;border-top:2px solid #0f2a5c}.note{margin-top:10px;font-size:10px;color:#666;text-align:center}</style></head><body>
+<div class="hd">${logo ? `<img src="${logo}" alt="RUHANIS">` : '<b>RUHANIS</b>'}<div><b>${esc(title)}</b><span>${esc(sub)}</span></div></div>
+<table><thead><tr>${head}</tr></thead><tbody>${bodyRows}</tbody><tfoot>${foot}</tfoot></table>
+<div class="note">RUHANIS · বল্লা, কালিহাতী, টাঙ্গাইল, ঢাকা, বাংলাদেশ</div>
+<script>window.onload=function(){setTimeout(function(){window.print();},500);};<\/script></body></html>`);
+    w.document.close();
+  }
+  function printSm() {
+    const R = SM.rows.filter(t => !t.none);
+    const th = ['Salesman', 'অর্ডার', 'Delivered', 'ফেল', 'বিক্রয়', 'প্রতি সেল', 'কমিশন', 'বেতন', 'মোট প্রদেয়'].map((h, i) => `<th class="${i ? 'r' : ''}">${h}</th>`).join('');
+    const rows = R.map(t => `<tr><td>${esc(t.name)}</td><td class="r">${t.total}</td><td class="r">${t.delivered}</td><td class="r">${t.failed}</td><td class="r">${tk(t.sales)}</td><td class="r">${tk(t.perSale)}</td><td class="r">${tk(t.commission)}</td><td class="r">${SM.ym ? tk(t.paySalary) : '—'}</td><td class="r"><b>${tk(t.payable)}</b></td></tr>`).join('');
+    const sum = k => R.reduce((a, t) => a + t[k], 0);
+    printHtml('Salesman Payment Sheet', `${periodLabel()} · প্রিন্ট: ${new Date().toLocaleDateString('en-GB')}`, th, rows, `<tr><td>মোট</td><td class="r">${sum('total')}</td><td class="r">${sum('delivered')}</td><td class="r">${sum('failed')}</td><td class="r">${tk(sum('sales'))}</td><td></td><td class="r">${tk(sum('commission'))}</td><td class="r">${SM.ym ? tk(sum('paySalary')) : '—'}</td><td class="r">${tk(sum('payable'))}</td></tr>`);
+  }
+
+  // ───────── বাকি পেজ ─────────
+  function bakiList() {
+    const q = ($('baki-q') ? $('baki-q').value : '').trim().toLowerCase(), mode = $('baki-mode') ? $('baki-mode').value : 'delivered';
+    return allOrders().filter(o => (Number(o.due) || 0) > 0 && (mode === 'all' ? !FAIL.includes(o.status) : o.status === 'Delivered'))
+      .filter(o => !q || [o.customer, o.phone, o.id, o.product, o.salesman].join(' ').toLowerCase().includes(q))
+      .sort((a, b) => (Number(a.id) || 0) - (Number(b.id) || 0));
+  }
+  function bakiRender() {
+    const body = $('baki-body'); if (!body) return;
+    const rows = BK.rows = bakiList();
+    const due = rows.reduce((s, o) => s + (Number(o.due) || 0), 0), bill = rows.reduce((s, o) => s + (Number(o.total) || 0) + (Number(o.delivery) || 0), 0);
+    const custs = new Set(rows.map(o => String(o.phone || o.customer))).size;
+    const oldest = rows.reduce((m, o) => Math.max(m, ordDays(o) || 0), 0);
+    $('baki-kpis').innerHTML = [['📒 মোট বাকি', `<span style="color:var(--red)">${tk(due)}</span>`], ['🧾 বাকির অর্ডার', rows.length], ['👥 গ্রাহক', custs], ['⏰ সবচেয়ে পুরনো', rows.length ? oldest + ' দিন' : '—']].map(k => `<div class="sm-kpi"><small>${k[0]}</small><strong>${k[1]}</strong></div>`).join('');
+    $('baki-count').textContent = rows.length + 'টি অর্ডার';
+    if (!rows.length) { body.innerHTML = '<tr><td colspan="12" style="text-align:center;color:var(--text3);padding:40px;">🎉 কোনো বাকি নেই</td></tr>'; $('baki-foot').innerHTML = ''; updateBadge(); return; }
+    body.innerHTML = rows.map((o, i) => {
+      const days = ordDays(o), prods = (o.items || [{ product: o.product }]).map(x => esc(x.product)).join(', ');
+      return `<tr>
+        <td class="mono">${esc(o.id)}</td><td class="mono">${esc(o.date)}</td><td><strong>${esc(o.customer)}</strong></td>
+        <td class="mono">${o.phone ? `<a href="tel:${esc(o.phone)}" style="color:inherit;">${esc(o.phone)}</a>` : '—'}</td>
+        <td style="max-width:200px;white-space:normal;">${prods}</td>
+        <td class="mono" style="text-align:right;">${tk((Number(o.total) || 0) + (Number(o.delivery) || 0))}</td>
+        <td class="mono" style="text-align:right;color:var(--green);">${tk(o.paid)}</td>
+        <td class="mono" style="text-align:right;color:var(--red);font-weight:700;">${tk(o.due)}</td>
+        <td class="mono" style="text-align:right;${days > 14 ? 'color:var(--red);' : ''}">${days == null ? '—' : days + ' দিন'}</td>
+        <td><span class="status ${String(o.status || '').toLowerCase().replace(/ /g, '')}">${esc(o.status)}</span></td>
+        <td>${o.salesman ? `<span class="sm-tag">${esc(o.salesman)}</span>` : '—'}</td>
+        <td style="white-space:nowrap;"><button class="btn btn-gold" style="padding:4px 10px;font-size:11px;" onclick="bakiCollect(${i})">💰 আদায়</button> <button class="btn" style="padding:4px 8px;font-size:11px;" onclick="bakiEdit(${i})" title="অর্ডার Edit">✏️</button></td>
+      </tr>`;
+    }).join('');
+    $('baki-foot').innerHTML = `<tr style="font-weight:700;border-top:2px solid var(--border);"><td colspan="5">মোট (${rows.length}টি)</td><td class="mono" style="text-align:right;">${tk(bill)}</td><td class="mono" style="text-align:right;color:var(--green);">${tk(bill - due)}</td><td class="mono" style="text-align:right;color:var(--red);">${tk(due)}</td><td colspan="4"></td></tr>`;
+    updateBadge();
+  }
+  function bakiTotals() {
+    const rows = allOrders().filter(o => (Number(o.due) || 0) > 0 && o.status === 'Delivered');
+    return { n: rows.length, due: rows.reduce((s, o) => s + (Number(o.due) || 0), 0) };
+  }
+  function updateBadge() { const b = $('baki-badge'); if (b) { const t = bakiTotals(); b.textContent = t.n || ''; b.style.display = t.n ? '' : 'none'; } }
+  async function bakiOpenPage() { bakiRender(); await ensureSales(true); bakiRender(); refreshDash(); }
+  async function bakiReload() { await ensureSales(true); bakiRender(); refreshDash(); toast('✅ রিফ্রেশ হয়েছে'); }
+  function bakiEdit(i) { const o = BK.rows[i]; if (o && typeof openEditOrder === 'function') openEditOrder(o); }
+  function bakiCollect(i) {
+    const o = BK.rows[i]; if (!o) return; BK.cur = o;
+    const bill = (Number(o.total) || 0) + (Number(o.delivery) || 0);
+    $('baki-c-info').innerHTML = `<b>#${esc(o.id)} — ${esc(o.customer)}</b> ${o.phone ? '(' + esc(o.phone) + ')' : ''}<br>মোট বিল: <b>${tk(bill)}</b> · পেয়েছেন: <b style="color:var(--green)">${tk(o.paid)}</b> · বাকি: <b style="color:var(--red)">${tk(o.due)}</b>`;
+    $('baki-c-amt').value = Number(o.due) || 0; $('baki-c-method').selectedIndex = 0; bakiCPrev(); openModal('baki-collect');
+  }
+  function bakiCPrev() {
+    const o = BK.cur; if (!o) return; const a = parseFloat($('baki-c-amt').value) || 0, rest = Math.round(((Number(o.due) || 0) - a) * 100) / 100;
+    $('baki-c-prev').innerHTML = a <= 0 ? '' : (a > o.due ? '<span style="color:var(--red)">⚠️ বাকির চেয়ে বেশি দেওয়া যাবে না</span>' : (rest === 0 ? '✅ এতে পুরো বাকি শোধ হবে — অর্ডারটি বাকি তালিকা থেকে সরে যাবে' : `আদায়ের পর বাকি থাকবে: <b>${tk(rest)}</b>`));
+  }
+  async function bakiCSave() {
+    if (BK.busy || !BK.cur) return;
+    const a = parseFloat($('baki-c-amt').value) || 0;
+    if (a <= 0) { toast('⚠️ আদায়ের পরিমাণ দিন', 'error'); return; }
+    if (a > (Number(BK.cur.due) || 0) + 0.001) { toast('⚠️ বাকির চেয়ে বেশি দেওয়া যাবে না', 'error'); return; }
+    BK.busy = true; const btn = $('baki-c-save'); btn.disabled = true;
+    try {
+      const r = await postToAPI({ action: 'collectDue', orderId: BK.cur.id, amount: a, method: $('baki-c-method').value });
+      if (r && r.status !== 'error') {
+        closeModal('baki-collect'); toast(r.settled ? '✅ পুরো বাকি আদায় হয়েছে' : `✅ আদায় সেভ হয়েছে — বাকি ${tk(r.due)}`);
+        try { logAction(`বাকি আদায়: Order #${BK.cur.id} — ৳${a}`); } catch (e) {}
+        await ensureSales(true); bakiRender(); refreshDash();
+      } else if (r && r.message) toast('❌ ' + r.message, 'error');
+    } finally { BK.busy = false; btn.disabled = false; }
+  }
+  function bakiExport() {
+    const rows = [['Order #', 'তারিখ', 'গ্রাহক', 'ফোন', 'পণ্য', 'মোট বিল', 'পেয়েছি', 'বাকি', 'Status', 'Salesman']];
+    BK.rows.forEach(o => rows.push([o.id, o.date, o.customer, o.phone, (o.items || [{ product: o.product }]).map(x => x.product).join(', '), (Number(o.total) || 0) + (Number(o.delivery) || 0), o.paid, o.due, o.status, o.salesman || '']));
+    csv(rows, `baki_${new Date().toISOString().slice(0, 10)}.csv`);
+  }
+  function bakiPrint() {
+    const R = BK.rows, due = R.reduce((s, o) => s + (Number(o.due) || 0), 0);
+    const th = ['#', 'তারিখ', 'গ্রাহক', 'ফোন', 'পণ্য', 'মোট বিল', 'পেয়েছি', 'বাকি'].map((h, i) => `<th class="${i > 4 ? 'r' : ''}">${h}</th>`).join('');
+    const rows = R.map(o => `<tr><td>${esc(o.id)}</td><td>${esc(o.date)}</td><td>${esc(o.customer)}</td><td>${esc(o.phone)}</td><td>${(o.items || [{ product: o.product }]).map(x => esc(x.product)).join(', ')}</td><td class="r">${tk((Number(o.total) || 0) + (Number(o.delivery) || 0))}</td><td class="r">${tk(o.paid)}</td><td class="r"><b>${tk(o.due)}</b></td></tr>`).join('');
+    printHtml('বাকি তালিকা (Due List)', `${R.length}টি অর্ডার · মোট বাকি ${tk(due)} · প্রিন্ট: ${new Date().toLocaleDateString('en-GB')}`, th, rows, `<tr><td colspan="7">মোট বাকি</td><td class="r">${tk(due)}</td></tr>`);
+  }
+
+
+  // ───────── CSV Import (Salesman তালিকা) ─────────
+  const IMPX = { rows: [], busy: false };
+  const CSVH = () => window.__igxCsv || {};
+  function smSample() { csv([['Name', 'Per Sale', 'Monthly Salary', 'Note', 'Active'], ['Rahim', 30, 5000, 'Dhaka team', 'Yes'], ['Karim', 20, 0, '', 'Yes']], 'salesmen_sample.csv'); }
+  function impReset() { IMPX.rows = []; $('sm-imp-preview').style.display = 'none'; $('sm-imp-go').style.display = 'none'; $('sm-imp-drop').style.display = 'block'; $('sm-imp-file').value = ''; }
+  function openImp() { impReset(); openModal('sm-import'); }
+  function impRead(file) {
+    if (!file) return;
+    const rd = new FileReader();
+    rd.onload = () => impAnalyze(String(rd.result || ''));
+    rd.readAsText(file, 'UTF-8');
+  }
+  function impAnalyze(text) {
+    const H = CSVH(), all = H.parseCSV ? H.parseCSV(text) : [];
+    if (all.length < 2) { toast('CSV-এ কোনো ডেটা নেই', 'error'); return; }
+    const b2e = H.bn2en || (x => x), amt = H.parseAmt || (v => parseFloat(v));
+    const hd = all[0].map(h => b2e(String(h)).toLowerCase().replace(/\(.*?\)|৳/g, '').trim());
+    const find = vs => hd.findIndex(h => h && vs.some(v => h === v || h.includes(v)));
+    const ci = { name: find(['name', 'নাম', 'salesman']), ps: find(['per sale', 'persale', 'প্রতি সেল', 'কমিশন', 'commission']), sal: find(['salary', 'বেতন']), note: find(['note', 'নোট']), act: find(['active', 'সক্রিয়']) };
+    if (ci.name < 0) { toast('Header পাওয়া যায়নি — প্রথম লাইনে Name কলাম থাকতে হবে', 'error'); return; }
+    const exist = new Set(SM.list.map(s => s.name.toLowerCase())), seen = new Set(), rows = [];
+    all.slice(1).forEach((r, i) => {
+      const cell = k => (ci[k] >= 0 ? String(r[ci[k]] == null ? '' : r[ci[k]]).trim() : '');
+      const name = cell('name').replace(/\s+/g, ' '); if (!name && !cell('ps') && !cell('sal')) return;
+      const ps = cell('ps') === '' ? 0 : amt(cell('ps')), sal = cell('sal') === '' ? 0 : amt(cell('sal'));
+      let state = 'ok';
+      if (!name) state = 'নাম নেই'; else if (!(ps >= 0) || !(sal >= 0)) state = 'টাকার পরিমাণ ভুল';
+      else if (exist.has(name.toLowerCase())) state = 'আগে থেকেই আছে';
+      else if (seen.has(name.toLowerCase())) state = 'ফাইলে ডুপ্লিকেট';
+      if (state === 'ok') seen.add(name.toLowerCase());
+      rows.push({ name, perSale: ps, salary: sal, note: cell('note').slice(0, 300), active: !/^(no|false|0|না|নিষ্ক্রিয়)$/i.test(cell('act')), state });
+    });
+    IMPX.rows = rows;
+    const okN = rows.filter(r => r.state === 'ok').length;
+    $('sm-imp-summary').innerHTML = `মোট ${rows.length}টি সারি · ✅ Import হবে <b style="color:var(--green)">${okN}</b> · ⏭️ বাদ ${rows.length - okN}`;
+    $('sm-imp-tbody').innerHTML = rows.map(r => `<tr style="${r.state === 'ok' ? '' : 'opacity:.55;'}"><td style="padding:5px 10px;">${esc(r.name) || '—'}</td><td style="padding:5px 10px;text-align:right;">${isFinite(r.perSale) ? tk(r.perSale) : '—'}</td><td style="padding:5px 10px;text-align:right;">${isFinite(r.salary) ? tk(r.salary) : '—'}</td><td style="padding:5px 10px;color:${r.state === 'ok' ? 'var(--green)' : 'var(--red)'};">${r.state === 'ok' ? '✅ নতুন' : esc(r.state)}</td></tr>`).join('');
+    $('sm-imp-drop').style.display = 'none'; $('sm-imp-preview').style.display = 'block'; $('sm-imp-go').style.display = okN ? '' : 'none';
+  }
+  async function impGo() {
+    if (IMPX.busy) return;
+    const rows = IMPX.rows.filter(r => r.state === 'ok'); if (!rows.length) return;
+    IMPX.busy = true; const btn = $('sm-imp-go'); btn.disabled = true;
+    try {
+      const r = await postToAPI({ action: 'bulkImportSalesmen', rows: rows.map(x => ({ name: x.name, perSale: x.perSale, salary: x.salary, note: x.note, active: x.active })) });
+      if (r && r.status !== 'error') {
+        closeModal('sm-import'); toast(`✅ ${r.added}টি Salesman Import হয়েছে${r.skipped ? ` (${r.skipped}টি আগে থেকেই ছিল)` : ''}`);
+        try { logAction(`Salesman CSV import: ${r.added}টি`); } catch (e) {}
+        await loadSalesmen(); render(); refreshDash();
+      }
+    } finally { IMPX.busy = false; btn.disabled = false; }
+  }
+
+  // ───────── Dashboard কার্ড ─────────
+  function refreshDash() {
+    try {
+      const t = bakiTotals();
+      if ($('kpi-baki')) { $('kpi-baki').textContent = num(t.due); $('kpi-baki-sub').textContent = t.n ? `${t.n}টি Delivered অর্ডারে বাকি` : 'কোনো বাকি নেই'; }
+      if ($('kpi-top-salesman')) {
+        const saved = SM.ym; SM.ym = todayYM(); const rows = compute().filter(r => !r.none && r.total > 0); SM.ym = saved;
+        const top = rows[0];
+        $('kpi-top-salesman').textContent = top ? top.name : '—';
+        $('kpi-top-salesman-sub').textContent = top ? `এই মাস: ✅ ${top.delivered} · ❌ ${top.failed} · মোট ${top.total}` : 'এই মাসে কোনো Salesman-এর অর্ডার নেই';
+      }
+      updateBadge();
+    } catch (e) {}
+  }
+
+  // loadLiveSales শেষ হলে নতুন মডিউলগুলো আপডেট হবে (মূল ফাংশন অপরিবর্তিত)
+  const _ls = window.loadLiveSales;
+  if (typeof _ls === 'function') {
+    window.loadLiveSales = async function () {
+      const r = await _ls.apply(this, arguments);
+      try {
+        if (!SM.loaded || Date.now() - SM.lastLoad > 60000) await loadSalesmen();
+        refreshDash();
+        if ($('page-salesmen') && $('page-salesmen').classList.contains('active')) render();
+        if ($('page-baki') && $('page-baki').classList.contains('active')) bakiRender();
+      } catch (e) {}
+      return r;
+    };
+  }
+  if (typeof pageTitles === 'object') {
+    pageTitles.salesmen = ['Salesmen', '— বিক্রয়কর্মী ট্র্যাকিং ও বেতন'];
+    pageTitles.baki = ['বাকি (Due)', '— ডেলিভারি হয়েছে কিন্তু টাকা বাকি'];
+  }
+  Object.assign(window, { smOpenPage: openPage, smReload: reload, smPeriod: v => { SM.ym = v || ''; render(); }, smAll: () => { SM.ym = ''; render(); }, smThisMonth: () => { SM.ym = todayYM(); render(); },
+    smDrill: drill, smOpenEdit: openEdit, smSave: save, smDelete: del, smExport: exportSm, smOpenImport: openImp, smImpRead: impRead, smImpGo: impGo, smSampleCSV: smSample, smPrint: printSm, smFillOrderSelect: fillOrderSelect, smLoad: loadSalesmen,
+    bakiOpenPage, bakiReload, bakiRender, bakiEdit, bakiCollect, bakiCPrev, bakiCSave, bakiExport, bakiPrint });
+})();
 </script>
 </body>
 </html>
