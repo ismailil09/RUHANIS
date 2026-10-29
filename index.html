@@ -3361,6 +3361,7 @@ tbody td.muted{color:var(--text3);}
           <button class="btn" onclick="cfLoad()">🔄 রিফ্রেশ</button>
           <button class="btn" style="background:rgba(88,166,255,0.15);border-color:rgba(88,166,255,0.4);color:#58a6ff;" onclick="cfOpenImport()">📥 Import CSV</button>
           <button class="btn export-excel" onclick="cfExport()">📥 Export Excel</button>
+          <button class="btn" onclick="cfPrint()">🖨️ Print</button>
         </div>
       </div>
 
@@ -4757,7 +4758,7 @@ tbody td.muted{color:var(--text3);}
         <div class="form-group full"><label class="form-label">Description <span style="color:var(--text3);font-size:10px;">(🔒 শুধু আমরা দেখব — কুরিয়ারে কখনো যাবে না)</span></label><textarea class="form-textarea" id="order-description" placeholder="নিজেদের মনে রাখার জন্য — এটা কুরিয়ার বুকিং-এ পাঠানো হবে না..."></textarea></div>
 
         <!-- ═══ MODULE 1: Project + Profit Split ═══ -->
-        <div class="form-group full" style="background:var(--bg3);border:1px solid rgba(212,160,23,.25);border-radius:10px;padding:14px;margin-top:4px;">
+        <div class="form-group full" style="display:none;background:var(--bg3);border:1px solid rgba(212,160,23,.25);border-radius:10px;padding:14px;margin-top:4px;">
           <div style="font-size:12px;font-weight:700;color:var(--gold);margin-bottom:12px;letter-spacing:.5px;">💰 প্রফিট বণ্টন সেটআপ</div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;align-items:end;">
             <!-- Project Name -->
@@ -4896,7 +4897,7 @@ tbody td.muted{color:var(--text3);}
         </datalist>
 
         <!-- ══ PROFIT SPLIT SECTION ══ -->
-        <div class="profit-split-section">
+        <div class="profit-split-section" style="display:none;">
           <div class="profit-split-header">
             <div class="profit-split-title">💰 প্রফিট বণ্টন সেটিংস</div>
             <button class="equal-split-btn" type="button" onclick="applyEqualSplitProduct('add')">⚖️ সমান ভাগে ভাগ করুন</button>
@@ -5013,7 +5014,7 @@ tbody td.muted{color:var(--text3);}
         <div class="form-group full"><label class="form-label">Notes</label><textarea class="form-textarea" id="eprod-notes"></textarea></div>
 
         <!-- ══ PROFIT SPLIT SECTION (Edit) ══ -->
-        <div class="profit-split-section">
+        <div class="profit-split-section" style="display:none;">
           <div class="profit-split-header">
             <div class="profit-split-title">💰 প্রফিট বণ্টন সেটিংস</div>
             <button class="equal-split-btn" type="button" onclick="applyEqualSplitProduct('edit')">⚖️ সমান ভাগে ভাগ করুন</button>
@@ -15544,7 +15545,7 @@ window.syncCourierData = async function () {
     igxPickPeriod: opts => new Promise(resolve => {
       build(); if (resolver) finish(null);
       cfg = opts; resolver = resolve;
-      $('igxp-title').textContent = '📅 Export — ' + (opts.title || 'সময়কাল বাছুন');
+      $('igxp-title').textContent = '📅 ' + (opts.verb || 'Export') + ' — ' + (opts.title || 'সময়কাল বাছুন'); $('igxp-go').textContent = opts.verb === 'Print' ? '🖨️ প্রিন্ট করুন' : '📥 Export করুন';
       $('igxp-mode').value = 'all'; update(); modal.classList.add('open');
     })
   });
@@ -15917,6 +15918,33 @@ window.syncCourierData = async function () {
     toast(`📥 ${asc.length}টি লেনদেন export হয়েছে (${pk.label})`, 'success');
     try { logAction(`Cash Flow export: ${asc.length}টি লেনদেন`); } catch (e) {}
   }
+  async function printCF() {
+    if (!CF.loaded) { toast('আগে Cash Flow ডেটা লোড করুন', 'error'); return; }
+    if (!CF.entries.length && !CF.openingSet) { toast('প্রিন্ট করার মতো কোনো ডেটা নেই', 'error'); return; }
+    const pk = await igxPickPeriod({ title: 'Cash Flow', verb: 'Print', rows: CF.entries, getDate: e => e.date }); if (!pk) return;
+    const w = window.open('', '_blank'); if (!w) { toast('পপ-আপ ব্লক করা আছে — অনুমতি দিন', 'error'); return; }
+    const asc = pk.rows.slice().sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : idNum(a) - idNum(b)));
+    const run = runningMap(); let c = 0, d = 0;
+    asc.forEach(e => { const q = Math.round(e.amount * 100); if (e.type === 'Credit') c += q; else d += q; });
+    const t = compute(), logo = window.RUH_LOGO_BLACK || '';
+    const tr = asc.map((e, i) => { const cr = e.type === 'Credit'; return `<tr><td>${i + 1}</td><td>${fmtDate(e.date)}</td><td>${cr ? 'Credit' : 'Debit'}</td><td class="r ${cr ? 'g' : 'rd'}">${cr ? '+' : '−'}৳${num(e.amount)}</td><td>${esc(e.note) || '—'}</td><td class="r">${money(run[e.id])}</td></tr>`; }).join('');
+    const opRow = (CF.openingSet && pk.mode === 'all') ? `<tr class="op"><td></td><td>${fmtDate(CF.openingDate)}</td><td colspan="2">Opening Balance</td><td></td><td class="r">${money(CF.opening)}</td></tr>` : '';
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>RUHANIS Cash Flow</title><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700&display=swap" rel="stylesheet"><style>
+@page{size:A4;margin:12mm}body{font-family:'Noto Sans Bengali',Arial,sans-serif;color:#111;font-size:12px;margin:0}
+.hd{display:flex;align-items:center;gap:14px;border-bottom:2px solid #0f2a5c;padding-bottom:8px;margin-bottom:10px}.hd img{max-height:52px}.hd b{font-size:18px;color:#0f2a5c;display:block}.hd span{font-size:11px;color:#555}
+.sum{display:flex;gap:8px;margin-bottom:10px}.sum div{flex:1;border:1px solid #ccc;border-radius:6px;padding:6px 8px}.sum small{display:block;color:#666;font-size:10px}.sum strong{font-size:14px}
+table{width:100%;border-collapse:collapse}th{background:#0f2a5c;color:#fff;text-align:left;padding:5px 6px;font-size:11px}td{padding:4px 6px;border-bottom:1px solid #ddd;vertical-align:top}tr{page-break-inside:avoid}
+.r{text-align:right;white-space:nowrap}.g{color:#117a2f}.rd{color:#b42318}.op td{background:#f3f4f6;font-weight:700}tfoot td{font-weight:700;border-top:2px solid #0f2a5c}
+.note{margin-top:10px;font-size:10px;color:#666;text-align:center}</style></head><body>
+<div class="hd">${logo ? `<img src="${logo}" alt="RUHANIS">` : '<b>RUHANIS</b>'}<div><b>Cash Flow Statement</b><span>${esc(pk.label)} · প্রিন্ট: ${fmtDate(todayBD())}</span></div></div>
+<div class="sum"><div><small>Opening Balance</small><strong>${money(t.opening)}</strong></div><div><small>মোট Credit (এই তালিকা)</small><strong class="g">${money(c / 100)}</strong></div><div><small>মোট Debit (এই তালিকা)</small><strong class="rd">${money(d / 100)}</strong></div><div><small>Current Balance</small><strong>${money(t.balance)}</strong></div></div>
+<table><thead><tr><th>#</th><th>তারিখ</th><th>ধরন</th><th class="r">পরিমাণ</th><th>নোট</th><th class="r">Balance After</th></tr></thead><tbody>${opRow}${tr}</tbody>
+<tfoot><tr><td colspan="3">মোট ${asc.length}টি লেনদেন</td><td class="r">+${money(c / 100)} / −${money(d / 100)}</td><td></td><td class="r">নেট ${money((c - d) / 100)}</td></tr></tfoot></table>
+<div class="note">RUHANIS · বল্লা, কালিহাতী, টাঙ্গাইল, ঢাকা, বাংলাদেশ</div>
+<script>window.onload=function(){setTimeout(function(){window.print();},500);};<\/script></body></html>`);
+    w.document.close();
+    try { logAction(`Cash Flow print: ${asc.length}টি লেনদেন`); } catch (e) {}
+  }
   function sampleCSV() {
     downloadCSV([['Date', 'Type', 'Amount', 'Note'], ['2026-10-01', 'Opening Balance', 10000, 'শুরুর ব্যালেন্স (ঐচ্ছিক)'], ['2026-10-05', 'Credit', 5000, 'বিক্রির টাকা'], ['2026-10-06', 'Debit', 1200.5, 'অফিস ভাড়া']], 'cashflow_sample.csv');
   }
@@ -16039,7 +16067,7 @@ window.syncCourierData = async function () {
   }
 
   // inline onclick-এর জন্য global expose (সব নাম cf-প্রিফিক্স)
-  Object.assign(window, { cfLoad: load, cfRender: render, cfOpenEntry: openEntry, cfSetType: setType, cfSubmitEntry: submitEntry, cfDelete: del, cfOpenOpening: openOpening, cfSubmitOpening: submitOpening, cfPreviewOpening: cfPreview, cfKpi: openKpi, cfKpiSet: kpiSet, cfKpiSearch: kpiSearch, cfKpiToMain: kpiToMain, cfKpiCsv: kpiCsv, cfClearFilters: clearFilters, cfRefreshCard: refreshCard, cfRetry: retry, cfDiscard: discard, cfRetryAll: retryAll, __cfCompute: compute, cfExport: exportCSV, cfSampleCSV: sampleCSV, cfOpenImport: openImport, cfCloseImport: closeImport, cfImpReset: impReset, cfImpRead: impRead, cfImpDrop: impDrop, cfImpRefresh: impRefresh, cfImpSubmit: impSubmit, __cfAnalyze: analyzeCSV, __cfParseCSV: parseCSV });
+  Object.assign(window, { cfLoad: load, cfRender: render, cfOpenEntry: openEntry, cfSetType: setType, cfSubmitEntry: submitEntry, cfDelete: del, cfOpenOpening: openOpening, cfSubmitOpening: submitOpening, cfPreviewOpening: cfPreview, cfKpi: openKpi, cfKpiSet: kpiSet, cfKpiSearch: kpiSearch, cfKpiToMain: kpiToMain, cfKpiCsv: kpiCsv, cfClearFilters: clearFilters, cfRefreshCard: refreshCard, cfRetry: retry, cfDiscard: discard, cfRetryAll: retryAll, __cfCompute: compute, cfExport: exportCSV, cfPrint: printCF, cfSampleCSV: sampleCSV, cfOpenImport: openImport, cfCloseImport: closeImport, cfImpReset: impReset, cfImpRead: impRead, cfImpDrop: impDrop, cfImpRefresh: impRefresh, cfImpSubmit: impSubmit, __cfAnalyze: analyzeCSV, __cfParseCSV: parseCSV });
 
   // ── বিদ্যমান নেভিগেশনে যুক্ত হওয়া — মূল showPage অপরিবর্তিত, শুধু wrap করা ──
   if (typeof pageTitles === 'object') pageTitles.cashflow = ['Cash Flow', '— আলাদা ক্যাশ ব্যালেন্স'];
